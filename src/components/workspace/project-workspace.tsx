@@ -8,6 +8,7 @@ import { UploadPanel } from "./upload-panel";
 import { ReviseEditor } from "./revise-editor";
 import { ConflictCard } from "./conflict-card";
 import { DocumentDrawer } from "./document-drawer";
+import { RfiPanel } from "./rfi-panel";
 
 const discColor: Record<string, string> = {
   SPEC: "var(--blueprint)",
@@ -170,6 +171,8 @@ export function ProjectWorkspace({
                 key={c.id}
                 conflict={c}
                 canEdit={canEdit}
+                projectId={projectId}
+                onRfiRaised={() => utils.rfi.list.invalidate({ projectId })}
                 onSetStatus={(status) =>
                   setStatus.mutate({ conflictId: c.id, status })
                 }
@@ -178,6 +181,8 @@ export function ProjectWorkspace({
           </div>
         </div>
       </div>
+
+      <RfiPanel projectId={projectId} canEdit={canEdit} />
 
       <div className="overflow-hidden rounded border border-line">
         <div className="mono border-b border-line bg-graphite/60 px-5 py-3 text-[10px] tracking-[0.24em] text-muted-2">

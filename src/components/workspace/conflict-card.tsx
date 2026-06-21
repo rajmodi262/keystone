@@ -28,15 +28,26 @@ export interface ConflictView {
 export function ConflictCard({
   conflict: c,
   canEdit = true,
+  projectId,
   onSetStatus,
+  onRfiRaised,
 }: {
   conflict: ConflictView;
   canEdit?: boolean;
+  projectId: string;
   onSetStatus: (status: "RESOLVED" | "DISMISSED") => void;
+  onRfiRaised?: () => void;
 }) {
   const [explanation, setExplanation] = useState<string | null>(null);
+  const [raised, setRaised] = useState<string | null>(null);
   const explain = api.conflicts.explain.useMutation({
     onSuccess: (r) => setExplanation(r.explanation),
+  });
+  const raiseRfi = api.rfi.create.useMutation({
+    onSuccess: (r) => {
+      setRaised(`RFI-${String(r.number).padStart(2, "0")} raised`);
+      onRfiRaised?.();
+    },
   });
   const color = SEV_HEX[c.severity] ?? SEV_HEX.MODERATE;
 
@@ -91,6 +102,25 @@ export function ConflictCard({
         >
           {explain.isPending ? "THINKING…" : "EXPLAIN"}
         </button>
+        {canEdit &&
+          (raised ? (
+            <span className="mono text-[9px] tracking-[0.14em] text-blueprint">
+              {raised}
+            </span>
+          ) : (
+            <button
+              onClick={() =>
+                raiseRfi.mutate({
+                  projectId,
+                  question: `Conflict on ${c.topic}: ${c.docA.code} states ${c.valueA}, ${c.docB.code} states ${c.valueB}. Please confirm the governing requirement.`,
+                })
+              }
+              disabled={raiseRfi.isPending}
+              className="mono rounded border border-line px-2 py-0.5 text-[9px] tracking-[0.14em] text-hazard transition-colors hover:border-hazard disabled:opacity-50"
+            >
+              {raiseRfi.isPending ? "RAISING…" : "RAISE RFI"}
+            </button>
+          ))}
         {c.status === "OPEN" && canEdit ? (
           <>
             <button

@@ -5,6 +5,7 @@ import { documentsRouter } from "./documents";
 import { conflictsRouter } from "./conflicts";
 import { aiRouter } from "./ai";
 import { membersRouter } from "./members";
+import { rfiRouter } from "./rfi";
 
 export const appRouter = createTRPCRouter({
   health: publicProcedure.query(() => ({ ok: true, ts: Date.now() })),
@@ -14,6 +15,7 @@ export const appRouter = createTRPCRouter({
   conflicts: conflictsRouter,
   ai: aiRouter,
   members: membersRouter,
+  rfi: rfiRouter,
 });
 
 export type AppRouter = typeof appRouter;
