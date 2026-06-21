@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { extractPdfText } from "@/lib/pdf-ocr";
 
 const DISCIPLINES = ["SPEC", "STRUCT", "ARCH", "MECH", "ELEC", "CIVIL", "RFI", "OTHER"];
 
@@ -15,6 +16,7 @@ export function UploadPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const [form, setForm] = useState({
     code: "",
     title: "",
@@ -32,30 +34,42 @@ export function UploadPanel({
       setError("Choose a PDF first.");
       return;
     }
-    const fd = new FormData();
-    fd.set("projectId", projectId);
-    fd.set("code", form.code);
-    fd.set("title", form.title);
-    fd.set("discipline", form.discipline);
-    fd.set("revision", form.revision);
-    fd.set("file", file);
-
     setBusy(true);
     try {
+      setMsg("Reading PDF…");
+      const { text, usedOcr } = await extractPdfText(file, setMsg);
+      if (text.trim().length < 10) {
+        setError("No readable text found in this PDF.");
+        return;
+      }
+      setMsg(usedOcr ? "OCR complete — ingesting…" : "Ingesting…");
+
+      const fd = new FormData();
+      fd.set("projectId", projectId);
+      fd.set("code", form.code);
+      fd.set("title", form.title);
+      fd.set("discipline", form.discipline);
+      fd.set("revision", form.revision);
+      fd.set("rawText", text);
+      fd.set("fileName", file.name);
+
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Upload failed");
         return;
       }
-      setOk(`Ingested ${form.code} — ${data.chunks} chunks, ${data.refs} references.`);
+      setOk(
+        `Ingested ${form.code}${usedOcr ? " (via OCR)" : ""} — ${data.chunks} chunks, ${data.refs} references.`,
+      );
       setForm({ code: "", title: "", discipline: "SPEC", revision: "A" });
       if (fileRef.current) fileRef.current.value = "";
       onUploaded();
     } catch {
-      setError("Network error.");
+      setError("Could not process this PDF.");
     } finally {
       setBusy(false);
+      setMsg(null);
     }
   };
 
@@ -114,6 +128,12 @@ export function UploadPanel({
             className="mono w-full text-[11px] text-muted file:mr-3 file:rounded file:border file:border-line file:bg-blueprint/10 file:px-3 file:py-1.5 file:text-[10px] file:tracking-[0.1em] file:text-blueprint"
           />
 
+          <p className="mono text-[10px] text-muted-2">
+            Text PDFs parse instantly; scanned/image PDFs are OCR&apos;d in your
+            browser.
+          </p>
+
+          {msg && <p className="mono text-[11px] text-blueprint">{msg}</p>}
           {error && <p className="mono text-[11px] text-danger">{error}</p>}
           {ok && <p className="mono text-[11px] text-blueprint">{ok}</p>}
 
@@ -122,7 +142,7 @@ export function UploadPanel({
             disabled={busy}
             className="mono w-full rounded bg-blueprint py-2.5 text-[11px] font-semibold tracking-[0.12em] text-[#06212e] transition-colors hover:bg-[#5ccfff] disabled:opacity-50"
           >
-            {busy ? "PARSING & EMBEDDING…" : "UPLOAD & INGEST"}
+            {busy ? msg ?? "WORKING…" : "UPLOAD & INGEST"}
           </button>
         </form>
       )}

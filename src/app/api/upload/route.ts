@@ -32,21 +32,16 @@ export async function POST(req: Request) {
   const revision = String(form.get("revision") ?? "A").trim() || "A";
   const disciplineRaw = String(form.get("discipline") ?? "OTHER").toUpperCase();
   const file = form.get("file");
+  const clientText = String(form.get("rawText") ?? "").trim();
+  const fileName =
+    String(form.get("fileName") ?? "").trim() ||
+    (file instanceof File ? file.name : "document.pdf");
 
   if (!projectId || !code || !title) {
     return NextResponse.json({ error: "projectId, code and title are required" }, { status: 400 });
   }
   if (!DISCIPLINES.includes(disciplineRaw)) {
     return NextResponse.json({ error: "Invalid discipline" }, { status: 400 });
-  }
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "A PDF file is required" }, { status: 400 });
-  }
-  if (file.type && file.type !== "application/pdf") {
-    return NextResponse.json({ error: "Only PDF files are accepted" }, { status: 415 });
-  }
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "File exceeds 15 MB limit" }, { status: 413 });
   }
 
   // Access control: caller must be a member of the project's organization.
@@ -66,19 +61,31 @@ export async function POST(req: Request) {
       { status: 403 },
     );
 
-  // Parse the PDF to text.
-  let rawText = "";
-  try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const pdf = await getDocumentProxy(bytes);
-    const result = await extractText(pdf, { mergePages: true });
-    rawText = Array.isArray(result.text) ? result.text.join("\n\n") : result.text;
-  } catch {
-    return NextResponse.json({ error: "Could not read this PDF" }, { status: 422 });
+  // Text source: client-extracted (incl. browser OCR) if provided, otherwise
+  // parse the uploaded PDF server-side.
+  let rawText = clientText;
+  if (rawText.length < 10) {
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "A PDF file or extracted text is required" }, { status: 400 });
+    }
+    if (file.type && file.type !== "application/pdf") {
+      return NextResponse.json({ error: "Only PDF files are accepted" }, { status: 415 });
+    }
+    if (file.size > MAX_BYTES) {
+      return NextResponse.json({ error: "File exceeds 15 MB limit" }, { status: 413 });
+    }
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const pdf = await getDocumentProxy(bytes);
+      const result = await extractText(pdf, { mergePages: true });
+      rawText = Array.isArray(result.text) ? result.text.join("\n\n") : result.text;
+    } catch {
+      return NextResponse.json({ error: "Could not read this PDF" }, { status: 422 });
+    }
   }
   if (rawText.trim().length < 10) {
     return NextResponse.json(
-      { error: "No extractable text (scanned PDFs need OCR first)" },
+      { error: "No extractable text — try a text-based PDF, or one OCR can read." },
       { status: 422 },
     );
   }
@@ -90,7 +97,7 @@ export async function POST(req: Request) {
     discipline: disciplineRaw as Discipline,
     revision,
     rawText,
-    fileName: file.name,
+    fileName,
   });
 
   // A new document can create or resolve contradictions — refresh them.
