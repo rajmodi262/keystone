@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Keystone — The Lighttable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#070A11;
+    --ink2:#0A0E17;
+    --graphite:#0E131C;
+    --graphite2:#141C29;
+    --line:#1C2738;
+    --hair:rgba(57,194,255,.10);
+    --hair-strong:rgba(57,194,255,.22);
+    --blueprint:#39C2FF;
+    --blueprint-dim:#2A6E8F;
+    --hazard:#FFB020;
+    --danger:#FF3B47;
+    --chalk:#EAF1FA;
+    --muted:#8294AD;
+    --muted2:#54647C;
+    --ease:cubic-bezier(.2,.9,.1,1);
+    --grot:'Space Grotesk',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--ink);
+    color:var(--chalk);
+    font-family:var(--grot);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* the unlit lighttable: blueprint substrate + vignette */
+  .stage{
+    position:fixed;inset:0;
+    background:
+      radial-gradient(120% 90% at 50% 40%, rgba(57,194,255,.05), transparent 60%),
+      radial-gradient(140% 120% at 50% 50%, transparent 55%, rgba(0,0,0,.65) 100%),
+      linear-gradient(0deg,var(--ink),var(--ink2));
+  }
+  .grid{
+    position:absolute;inset:0;
+    background-image:
+      linear-gradient(var(--hair) 1px,transparent 1px),
+      linear-gradient(90deg,var(--hair) 1px,transparent 1px),
+      linear-gradient(rgba(57,194,255,.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(57,194,255,.04) 1px,transparent 1px);
+    background-size:120px 120px,120px 120px,24px 24px,24px 24px;
+    mask-image:radial-gradient(120% 100% at 50% 45%,#000 55%,transparent 100%);
+  }
+  /* title-block frame */
+  .frame{position:absolute;inset:18px;border:1px solid var(--hair-strong);pointer-events:none}
+  .crop{position:absolute;width:14px;height:14px;border:1px solid var(--blueprint);opacity:.55}
+  .crop.tl{top:-1px;left:-1px;border-right:0;border-bottom:0}
+  .crop.tr{top:-1px;right:-1px;border-left:0;border-bottom:0}
+  .crop.bl{bottom:-1px;left:-1px;border-right:0;border-top:0}
+  .crop.br{bottom:-1px;right:-1px;border-left:0;border-top:0}
+  .coord{position:absolute;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--muted2)}
+
+  header{position:absolute;top:34px;left:42px;right:42px;display:flex;align-items:flex-start;justify-content:space-between;z-index:6}
+  .brand{display:flex;align-items:center;gap:12px}
+  .mark{width:26px;height:26px;position:relative}
+  .mark:before,.mark:after{content:"";position:absolute;inset:0;border:1.5px solid var(--blueprint)}
+  .mark:after{transform:rotate(45deg);opacity:.5}
+  .wordmark{font-weight:600;letter-spacing:.34em;font-size:14px}
+  .tagline{font-family:var(--mono);font-size:10px;color:var(--muted2);letter-spacing:.22em;margin-top:3px}
+  .ctx{text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7}
+  .ctx b{color:var(--chalk);font-weight:500}
+  .status{display:inline-flex;align-items:center;gap:7px;margin-top:6px;font-size:10px;letter-spacing:.2em;color:var(--blueprint)}
+  .blip{width:7px;height:7px;border-radius:50%;background:var(--blueprint);box-shadow:0 0 0 0 rgba(57,194,255,.6);animation:blip 2.4s var(--ease) infinite}
+  .status.alert{color:var(--danger)} .status.alert .blip{background:var(--danger);animation-duration:1s}
+  @keyframes blip{0%{box-shadow:0 0 0 0 rgba(57,194,255,.55)}70%{box-shadow:0 0 0 10px rgba(57,194,255,0)}100%{box-shadow:0 0 0 0 rgba(57,194,255,0)}}
+
+  svg.board{position:absolute;inset:0;width:100%;height:100%;z-index:2}
+  .edge{stroke:var(--blueprint-dim);stroke-width:1;opacity:.34;fill:none;transition:stroke .5s,opacity .5s}
+  .edge.dead{stroke:#243246;opacity:.5}
+  .node rect{fill:rgba(12,17,26,.96);stroke:var(--blueprint);stroke-width:1;transition:stroke .45s var(--ease),filter .45s}
+  .node .code{font-family:var(--mono);font-weight:600;font-size:15px;fill:var(--chalk)}
+  .node .kind{font-family:var(--mono);font-size:9px;letter-spacing:.18em;fill:var(--muted)}
+  .node .rev{font-family:var(--mono);font-size:9px;fill:var(--blueprint)}
+  .node .flag{font-family:var(--mono);font-size:9px;letter-spacing:.14em;opacity:0;transition:opacity .4s}
+  .node{filter:drop-shadow(0 0 0 transparent);transition:filter .5s}
+  .node.idle rect{stroke:#2C3A4E}
+  .node.idle .code{fill:#9fb0c6}
+  .node.live rect{stroke:var(--blueprint);filter:drop-shadow(0 0 6px rgba(57,194,255,.35))}
+  .node.stale rect{stroke:var(--hazard);filter:drop-shadow(0 0 12px rgba(255,176,32,.5))}
+  .node.stale .flag{opacity:1;fill:var(--hazard)}
+  .node.conflict rect{stroke:var(--danger);stroke-width:1.6;filter:drop-shadow(0 0 18px rgba(255,59,71,.65))}
+  .node.conflict .flag{opacity:1;fill:var(--danger)}
+  .node.source rect{stroke:#fff;filter:drop-shadow(0 0 22px rgba(255,255,255,.45))}
+  .node.source .flag{opacity:1;fill:#fff}
+  .pulse{fill:#fff;filter:drop-shadow(0 0 8px var(--blueprint))}
+
+  /* sonar sweep — the system is awake and watching */
+  .sweep{position:absolute;inset:0;z-index:1;pointer-events:none;mix-blend-mode:screen;
+    background:conic-gradient(from 0deg at 50% 46%, transparent 0deg, transparent 320deg, rgba(57,194,255,.10) 350deg, rgba(57,194,255,.22) 359deg, transparent 360deg);
+    mask-image:radial-gradient(60% 60% at 50% 46%,#000 0%,transparent 75%);
+    animation:spin 9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* HUD readout */
+  .hud{position:absolute;left:42px;bottom:46px;z-index:6;font-family:var(--mono)}
+  .hud .lbl{font-size:10px;letter-spacing:.26em;color:var(--muted2)}
+  .hud .row{display:flex;align-items:flex-end;gap:26px;margin-top:8px}
+  .hud .stat .n{font-size:34px;font-weight:600;line-height:1;color:var(--chalk);font-variant-numeric:tabular-nums}
+  .hud .stat.warn .n{color:var(--hazard)} .hud .stat.bad .n{color:var(--danger)}
+  .hud .stat .u{font-size:10px;letter-spacing:.2em;color:var(--muted);margin-top:6px}
+
+  /* controls */
+  .controls{position:absolute;right:42px;bottom:46px;z-index:6;display:flex;gap:12px}
+  button{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--chalk);
+    background:rgba(57,194,255,.06);border:1px solid var(--hair-strong);padding:13px 20px;border-radius:2px;
+    cursor:pointer;transition:all .25s var(--ease);display:inline-flex;align-items:center;gap:9px}
+  button:hover{background:rgba(57,194,255,.14);border-color:var(--blueprint);transform:translateY(-1px)}
+  button:active{transform:translateY(0) scale(.985)}
+  button.primary{color:#06212e;background:var(--blueprint);border-color:var(--blueprint);font-weight:600}
+  button.primary:hover{background:#5ccfff;box-shadow:0 0 24px rgba(57,194,255,.45)}
+  button .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+  /* conflict card — the held breath */
+  .card{position:absolute;top:50%;right:42px;transform:translate(120%,-50%);z-index:8;width:330px;
+    background:linear-gradient(180deg,rgba(20,12,14,.96),rgba(12,9,11,.97));
+    border:1px solid rgba(255,59,71,.5);border-radius:3px;
+    box-shadow:0 0 0 1px rgba(255,59,71,.12),0 24px 60px rgba(0,0,0,.6),0 0 40px rgba(255,59,71,.18);
+    opacity:0;transition:transform .7s var(--ease),opacity .5s}
+  .card.in{transform:translate(0,-50%);opacity:1}
+  .card .top{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid rgba(255,59,71,.25)}
+  .card .ic{width:22px;height:22px;border:1.5px solid var(--danger);border-radius:50%;display:grid;place-items:center;color:var(--danger);font-weight:700;font-size:13px;flex:none}
+  .card .top h3{margin:0;font-size:12px;letter-spacing:.22em;color:var(--danger);font-weight:600}
+  .card .top span{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:.06em}
+  .card .q{padding:13px 16px 4px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .card .q b{color:var(--chalk);font-weight:500}
+  .versus{padding:6px 16px 14px}
+  .vrow{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1px solid var(--hair);border-radius:2px;margin-top:9px;background:rgba(57,194,255,.03)}
+  .vrow.hot{border-color:rgba(255,59,71,.4);background:rgba(255,59,71,.06)}
+  .vrow .src{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.05em}
+  .vrow .src b{display:block;color:var(--chalk);font-size:11px;font-weight:500;letter-spacing:.1em;margin-bottom:2px}
+  .vrow .val{font-family:var(--mono);font-weight:600;font-size:18px;font-variant-numeric:tabular-nums}
+  .vrow .val.a{color:var(--chalk)} .vrow .val.b{color:var(--danger)}
+  .card .act{display:flex;gap:8px;padding:0 16px 16px}
+  .card .act button{flex:1;justify-content:center;padding:11px}
+  .card .act .raise{background:var(--danger);color:#2a0608;border-color:var(--danger);font-weight:600}
+  .card .act .raise:hover{background:#ff5b65;box-shadow:0 0 22px rgba(255,59,71,.5)}
+
+  .legend{position:absolute;left:42px;top:118px;z-index:5;font-family:var(--mono);font-size:10px;color:var(--muted2);letter-spacing:.08em;line-height:2.1}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:9px;vertical-align:0;border:1px solid}
+  .legend .c1{border-color:var(--blueprint);background:rgba(57,194,255,.2)}
+  .legend .c2{border-color:var(--hazard);background:rgba(255,176,32,.2)}
+  .legend .c3{border-color:var(--danger);background:rgba(255,59,71,.25)}
+  @media (max-width:760px){.card{display:none}.legend{display:none}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="grid"></div>
+  <div class="sweep"></div>
+  <div class="frame">
+    <span class="crop tl"></span><span class="crop tr"></span><span class="crop bl"></span><span class="crop br"></span>
+  </div>
+  <div class="coord" style="left:26px;top:50%">N 41°29′</div>
+  <div class="coord" style="right:26px;top:50%">W 81°41′</div>
+
+  <header>
+    <div class="brand">
+      <div class="mark"></div>
+      <div>
+        <div class="wordmark">KEYSTONE</div>
+        <div class="tagline">THE&nbsp;LIGHTTABLE&nbsp;/&nbsp;IMPACT&nbsp;ENGINE</div>
+      </div>
+    </div>
+    <div class="ctx">
+      PROJECT&nbsp;&nbsp;<b>Riverside Hospital — Phase 2</b><br>
+      SHEET SET&nbsp;&nbsp;<b>9 documents · 7 references</b>
+      <div class="status" id="status"><span class="blip"></span><span id="statusText">MONITORING</span></div>
+    </div>
+  </header>
+
+  <div class="legend">
+    <span class="c1"></span>IN&nbsp;SYNC<br>
+    <span class="c2"></span>STALE&nbsp;·&nbsp;IMPACTED<br>
+    <span class="c3"></span>CONTRADICTION
+  </div>
+
+  <svg class="board" id="board" viewBox="0 0 1000 560" preserveAspectRatio="xMidYMid meet"></svg>
+
+  <div class="hud">
+    <div class="lbl">BLAST RADIUS — DOWNSTREAM IMPACT</div>
+    <div class="row">
+      <div class="stat warn"><div class="n" id="nDraw">0</div><div class="u">DRAWINGS</div></div>
+      <div class="stat warn"><div class="n" id="nRfi">0</div><div class="u">RFIs</div></div>
+      <div class="stat bad"><div class="n" id="nConf">0</div><div class="u">CONFLICTS</div></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="commit"><span class="dot"></span>COMMIT REV C — 03 30 00</button>
+    <button id="reset">RESET</button>
+  </div>
+
+  <div class="card" id="card">
+    <div class="top">
+      <div class="ic">!</div>
+      <div><h3>CONTRADICTION</h3><span>Compressive strength · concrete</span></div>
+    </div>
+    <div class="q">Q: <b>What concrete strength is required?</b><br>Two governing sources disagree.</div>
+    <div class="versus">
+      <div class="vrow">
+        <div class="src"><b>SPEC 03 30 00</b>§2.1 · Rev C · today</div>
+        <div class="val a">30 MPa</div>
+      </div>
+      <div class="vrow hot">
+        <div class="src"><b>DRAWING S-201</b>note 4 · Rev A · predates</div>
+        <div class="val b">25 MPa</div>
+      </div>
+    </div>
+    <div class="act">
+      <button class="raise" id="raise">RAISE RFI</button>
+      <button id="dismiss">DISMISS</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const board=document.getElementById("board");
+const nodes={
+  spec1:{code:"03 30 00",kind:"SPEC",rev:"Rev C",x:175,y:285,type:"spec"},
+  rfi14:{code:"RFI-14",kind:"RFI",rev:"open",x:235,y:95,type:"rfi"},
+  s201 :{code:"S-201",kind:"STRUCT",rev:"Rev A",x:450,y:165,type:"draw"},
+  s202 :{code:"S-202",kind:"STRUCT",rev:"Rev B",x:450,y:300,type:"draw"},
+  a101 :{code:"A-101",kind:"ARCH",rev:"Rev C",x:450,y:430,type:"draw"},
+  m301 :{code:"M-301",kind:"MECH",rev:"Rev A",x:735,y:135,type:"draw"},
+  rfi22:{code:"RFI-22",kind:"RFI",rev:"open",x:735,y:255,type:"rfi"},
+  spec2:{code:"09 91 00",kind:"SPEC",rev:"Rev A",x:235,y:475,type:"spec"},
+  a102 :{code:"A-102",kind:"ARCH",rev:"Rev A",x:505,y:515,type:"draw"}
+};
+// child references parent  (child -> referenced doc)
+const refs=[["s201","spec1"],["s202","spec1"],["a101","spec1"],["rfi14","spec1"],
+            ["m301","s201"],["rfi22","s201"],["a102","spec2"]];
+const W=100,H=52;
+const cx=id=>nodes[id].x, cy=id=>nodes[id].y;
+
+// draw edges first (under nodes)
+const edgeEls={};
+refs.forEach(([a,b])=>{
+  const l=document.createElementNS(NS,"line");
+  l.setAttribute("x1",cx(a));l.setAttribute("y1",cy(a));
+  l.setAttribute("x2",cx(b));l.setAttribute("y2",cy(b));
+  l.setAttribute("class","edge");
+  board.appendChild(l); edgeEls[a+">"+b]=l;
+});
+// draw nodes
+const nodeEls={};
+for(const id in nodes){
+  const n=nodes[id];
+  const g=document.createElementNS(NS,"g");
+  g.setAttribute("class","node idle");
+  g.setAttribute("transform",`translate(${n.x-W/2},${n.y-H/2})`);
+  g.innerHTML=`<rect width="${W}" height="${H}" rx="2"></rect>
+    <text class="kind" x="12" y="18">${n.kind}</text>
+    <text class="rev" x="${W-12}" y="18" text-anchor="end">${n.rev}</text>
+    <text class="code" x="12" y="38">${n.code}</text>
+    <text class="flag" x="${W-12}" y="38" text-anchor="end"></text>`;
+  board.appendChild(g); nodeEls[id]=g;
+}
+function setState(id,st,flag){
+  const g=nodeEls[id]; g.setAttribute("class","node "+st);
+  if(flag!==undefined) g.querySelector(".flag").textContent=flag;
+}
+// BFS from spec1 over reversed refs -> ordered edges with depth
+function blastPlan(root){
+  const radj={}; refs.forEach(([a,b])=>{(radj[b]=radj[b]||[]).push(a);});
+  const seen=new Set([root]); let layer=[root],depth=0,plan=[];
+  while(layer.length){
+    const next=[];
+    layer.forEach(p=>(radj[p]||[]).forEach(c=>{
+      if(!seen.has(c)){seen.add(c);plan.push({from:p,to:c,depth});next.push(c);}
+    }));
+    layer=next;depth++;
+  }
+  return plan;
+}
+// animated travelling light along an edge
+function firePulse(from,to,dur){
+  return new Promise(res=>{
+    const e=edgeEls[to+">"+from]; if(e){e.classList.remove("dead");}
+    const c=document.createElementNS(NS,"circle");
+    c.setAttribute("r","4.5");c.setAttribute("class","pulse");board.appendChild(c);
+    const x1=cx(from),y1=cy(from),x2=cx(to),y2=cy(to);
+    const t0=performance.now();
+    (function step(t){
+      let k=Math.min(1,(t-t0)/dur);
+      const e2=1-Math.pow(1-k,3);
+      c.setAttribute("cx",x1+(x2-x1)*e2);
+      c.setAttribute("cy",y1+(y2-y1)*e2);
+      c.setAttribute("opacity",k<.85?1:(1-k)/.15);
+      if(k<1)requestAnimationFrame(step); else {c.remove();res();}
+    })(t0);
+  });
+}
+// odometer
+function tick(el,to){
+  const from=+el.textContent,t0=performance.now(),d=420;
+  (function s(t){let k=Math.min(1,(t-t0)/d);el.textContent=Math.round(from+(to-from)*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(s);})(t0);
+}
+
+const commit=document.getElementById("commit"),resetBtn=document.getElementById("reset"),
+      card=document.getElementById("card"),status=document.getElementById("status"),
+      statusText=document.getElementById("statusText");
+let draw=0,rfi=0,conf=0,running=false;
+
+async function runBlast(){
+  if(running)return; running=true; commit.disabled=true;
+  // epicentre lights, status flips to alert
+  setState("spec1","source","REVISED");
+  nodes.spec1; nodeEls.spec1.querySelector(".rev").textContent="Rev C";
+  status.classList.add("alert"); statusText.textContent="IMPACT DETECTED";
+  await new Promise(r=>setTimeout(r,260));
+  const plan=blastPlan("spec1");
+  // group by depth so each ring fires together
+  const byDepth={}; plan.forEach(p=>(byDepth[p.depth]=byDepth[p.depth]||[]).push(p));
+  for(const d of Object.keys(byDepth).sort()){
+    await Promise.all(byDepth[d].map(async p=>{
+      await firePulse(p.from,p.to,560);
+      const t=nodes[p.to].type;
+      if(p.to==="s201"){ setState("s201","conflict","CONFLICT"); conf++; draw++; tick(document.getElementById("nConf"),conf); tick(document.getElementById("nDraw"),draw); }
+      else{
+        setState(p.to,"stale","STALE");
+        if(t==="draw"){draw++;tick(document.getElementById("nDraw"),draw);}
+        if(t==="rfi"){rfi++;tick(document.getElementById("nRfi"),rfi);}
+      }
+    }));
+    await new Promise(r=>setTimeout(r,140));
+  }
+  // un-impacted branch dims to show contrast
+  edgeEls["a102>spec2"].classList.add("dead");
+  setTimeout(()=>card.classList.add("in"),260);
+  running=false;
+}
+function resetAll(){
+  card.classList.remove("in");
+  for(const id in nodes) setState(id,"idle","");
+  nodeEls.spec1.querySelector(".rev").textContent="Rev B";
+  for(const k in edgeEls) edgeEls[k].classList.remove("dead");
+  draw=rfi=conf=0;
+  document.getElementById("nDraw").textContent="0";
+  document.getElementById("nRfi").textContent="0";
+  document.getElementById("nConf").textContent="0";
+  status.classList.remove("alert"); statusText.textContent="MONITORING";
+  commit.disabled=false;
+}
+commit.addEventListener("click",runBlast);
+resetBtn.addEventListener("click",resetAll);
+document.getElementById("dismiss").addEventListener("click",()=>card.classList.remove("in"));
+document.getElementById("raise").addEventListener("click",()=>{
+  document.querySelector(".card .top h3").textContent="RFI-31 RAISED";
+  document.querySelector(".card .ic").textContent="↗";
+});
+// boot: nodes settle in sequence
+let i=0; for(const id in nodes){ const g=nodeEls[id]; g.style.opacity=0; g.style.transition="opacity .5s var(--ease)";
+  setTimeout(()=>{g.style.opacity=1; if(nodes[id].type!=="spec")setState(id,"idle","");},120+i*60); i++; }
+</script>
+</body>
+</html>

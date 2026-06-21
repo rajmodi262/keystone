@@ -1,0 +1,230 @@
+// Keystone — AEC Project & Document Intelligence Platform
+// PostgreSQL + pgvector. Multi-tenant: Organization -> Membership(role) -> User.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ----------------------------------------------------------------------------
+// Auth (NextAuth) + users
+// ----------------------------------------------------------------------------
+
+model User {
+  id            String       @id @default(cuid())
+  name          String?
+  email         String       @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  createdAt     DateTime     @default(now())
+  accounts      Account[]
+  sessions      Session[]
+  memberships   Membership[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ----------------------------------------------------------------------------
+// Tenancy + RBAC
+// ----------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  ARCHITECT
+  ENGINEER
+  CONTRACTOR
+  CLIENT
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  projects    Project[]
+}
+
+model Membership {
+  id     String       @id @default(cuid())
+  role   Role         @default(CONTRACTOR)
+  userId String
+  orgId  String
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+}
+
+// ----------------------------------------------------------------------------
+// Projects, documents, the dependency graph, RFIs, conflicts
+// ----------------------------------------------------------------------------
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Project {
+  id        String        @id @default(cuid())
+  orgId     String
+  name      String
+  code      String
+  status    ProjectStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  org       Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  documents Document[]
+  refs      Reference[]
+  rfis      Rfi[]
+  conflicts Conflict[]
+
+  @@index([orgId])
+}
+
+enum Discipline {
+  ARCH
+  STRUCT
+  MECH
+  ELEC
+  CIVIL
+  SPEC
+  RFI
+  OTHER
+}
+
+model Document {
+  id         String          @id @default(cuid())
+  projectId  String
+  code       String // e.g. "S-201" or "03 30 00"
+  title      String
+  discipline Discipline      @default(OTHER)
+  revision   String          @default("A")
+  fileName   String?
+  rawText    String?         @db.Text
+  createdAt  DateTime        @default(now())
+  project    Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  chunks     DocumentChunk[]
+  refsOut    Reference[]     @relation("RefFrom")
+  refsIn     Reference[]     @relation("RefTo")
+  conflictsA Conflict[]      @relation("ConflictDocA")
+  conflictsB Conflict[]      @relation("ConflictDocB")
+
+  @@index([projectId])
+  @@index([projectId, code])
+}
+
+// One searchable slice of a document + its embedding (pgvector).
+model DocumentChunk {
+  id         String                       @id @default(cuid())
+  documentId String
+  idx        Int
+  content    String                       @db.Text
+  embedding  Unsupported("vector(1536)")?
+  document   Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+// A directed edge in the project graph: fromDoc references code `toCode`
+// (resolved to toDoc when that document exists). Drives impact / blast-radius.
+model Reference {
+  id        String   @id @default(cuid())
+  projectId String
+  fromDocId String
+  toCode    String
+  toDocId   String?
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromDoc   Document @relation("RefFrom", fields: [fromDocId], references: [id], onDelete: Cascade)
+  toDoc     Document? @relation("RefTo", fields: [toDocId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([toDocId])
+  @@index([fromDocId])
+}
+
+enum RfiStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+model Rfi {
+  id        String    @id @default(cuid())
+  projectId String
+  number    Int
+  question  String    @db.Text
+  answer    String?   @db.Text
+  status    RfiStatus @default(OPEN)
+  createdAt DateTime  @default(now())
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, number])
+  @@index([projectId])
+}
+
+enum ConflictStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+// A detected contradiction between two documents (the headline feature).
+model Conflict {
+  id        String         @id @default(cuid())
+  projectId String
+  topic     String
+  question  String?
+  docAId    String
+  docBId    String
+  valueA    String
+  valueB    String
+  detail    String?        @db.Text
+  status    ConflictStatus @default(OPEN)
+  createdAt DateTime       @default(now())
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  docA      Document       @relation("ConflictDocA", fields: [docAId], references: [id], onDelete: Cascade)
+  docB      Document       @relation("ConflictDocB", fields: [docBId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}

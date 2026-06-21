@@ -2,22 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   KEYSTONE — "The Lighttable" design system
+   Dark, instrument-grade. Color = information, never decoration.
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #070a11;
+  --ink-2: #0a0e17;
+  --graphite: #0e131c;
+  --graphite-2: #141c29;
+  --line: #1c2738;
+  --hair: rgba(57, 194, 255, 0.1);
+  --hair-strong: rgba(57, 194, 255, 0.22);
+
+  --blueprint: #39c2ff;
+  --blueprint-dim: #2a6e8f;
+  --hazard: #ffb020;
+  --danger: #ff3b47;
+
+  --chalk: #eaf1fa;
+  --muted: #8294ad;
+  --muted-2: #54647c;
+
+  --ease: cubic-bezier(0.2, 0.9, 0.1, 1);
+  --radius: 3px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(120% 90% at 50% 30%, rgba(57, 194, 255, 0.05), transparent 60%),
+    radial-gradient(140% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.6) 100%),
+    linear-gradient(0deg, var(--ink), var(--ink-2));
+  color: var(--chalk);
+  font-family: var(--font-grotesk), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(57, 194, 255, 0.25);
+  color: #fff;
+}
+
+/* The blueprint substrate — a faint drafting grid that fades at the edges. */
+.lt-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--hair) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hair) 1px, transparent 1px),
+    linear-gradient(rgba(57, 194, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(57, 194, 255, 0.04) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+  -webkit-mask-image: radial-gradient(120% 100% at 50% 40%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(120% 100% at 50% 40%, #000 55%, transparent 100%);
+}
+
+/* Monospace = the voice of the documents (codes, revisions, dimensions). */
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 @layer utilities {
@@ -25,3 +80,19 @@ body {
     text-wrap: balance;
   }
 }
+
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--blueprint-dim); background-clip: content-box; }
+
+@keyframes lt-blip {
+  0% { box-shadow: 0 0 0 0 rgba(57, 194, 255, 0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(57, 194, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(57, 194, 255, 0); }
+}
+.lt-blip { animation: lt-blip 2.4s var(--ease) infinite; }

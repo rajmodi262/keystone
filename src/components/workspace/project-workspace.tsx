@@ -1,0 +1,156 @@
+"use client";
+
+import { api } from "@/lib/trpc/client";
+import { ImpactGraph } from "./impact-graph";
+import { AskPanel } from "./ask-panel";
+
+const discColor: Record<string, string> = {
+  SPEC: "var(--blueprint)",
+  STRUCT: "var(--blueprint)",
+  ARCH: "var(--blueprint)",
+  MECH: "var(--muted)",
+  ELEC: "var(--muted)",
+  CIVIL: "var(--muted)",
+  RFI: "var(--hazard)",
+  OTHER: "var(--muted-2)",
+};
+
+export function ProjectWorkspace({ projectId }: { projectId: string }) {
+  const graph = api.documents.graph.useQuery({ projectId });
+  const conflicts = api.conflicts.list.useQuery({ projectId });
+  const docs = api.documents.list.useQuery({ projectId });
+  const utils = api.useUtils();
+  const setStatus = api.conflicts.setStatus.useMutation({
+    onSuccess: () => utils.conflicts.list.invalidate({ projectId }),
+  });
+  const detect = api.conflicts.detect.useMutation({
+    onSuccess: () => utils.conflicts.list.invalidate({ projectId }),
+  });
+
+  const conflictDocIds = new Set<string>();
+  conflicts.data?.forEach((c) => {
+    conflictDocIds.add(c.docA.id);
+    conflictDocIds.add(c.docB.id);
+  });
+
+  return (
+    <div className="space-y-6">
+      {graph.data ? (
+        <ImpactGraph
+          nodes={graph.data.nodes}
+          edges={graph.data.edges}
+          conflictDocIds={conflictDocIds}
+        />
+      ) : (
+        <div className="flex h-[380px] items-center justify-center rounded border border-line bg-graphite/40">
+          <span className="mono text-[11px] tracking-[0.2em] text-muted-2">
+            LOADING GRAPH…
+          </span>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AskPanel projectId={projectId} />
+
+        <div className="rounded border border-line bg-graphite/60 p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="mono text-[10px] tracking-[0.24em] text-muted-2">
+              DETECTED CONFLICTS
+            </span>
+            <button
+              onClick={() => detect.mutate({ projectId })}
+              disabled={detect.isPending}
+              className="mono rounded border border-line px-2.5 py-1 text-[9px] tracking-[0.14em] text-muted transition-colors hover:border-blueprint hover:text-blueprint disabled:opacity-50"
+            >
+              {detect.isPending ? "SCANNING…" : "RE-SCAN"}
+            </button>
+          </div>
+
+          {conflicts.data?.length === 0 && (
+            <p className="mono text-[11px] text-muted">
+              No open contradictions. The lighttable is clear.
+            </p>
+          )}
+
+          <div className="space-y-2">
+            {conflicts.data?.map((c) => (
+              <div
+                key={c.id}
+                className="rounded border border-danger/30 bg-danger/5 p-3"
+              >
+                <div className="mono mb-2 flex items-center justify-between text-[11px] text-danger">
+                  <span>⚠ {c.topic}</span>
+                  <span className="text-[9px] text-muted-2">{c.status}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="mono text-muted">
+                    <b className="text-chalk">{c.docA.code}</b> · {c.valueA}
+                  </span>
+                  <span className="mono text-muted-2">vs</span>
+                  <span className="mono text-muted">
+                    <b className="text-chalk">{c.docB.code}</b> ·{" "}
+                    <span className="text-danger">{c.valueB}</span>
+                  </span>
+                </div>
+                {c.status === "OPEN" && (
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() =>
+                        setStatus.mutate({ conflictId: c.id, status: "RESOLVED" })
+                      }
+                      className="mono rounded border border-line px-2 py-0.5 text-[9px] text-muted transition-colors hover:border-blueprint hover:text-blueprint"
+                    >
+                      RESOLVE
+                    </button>
+                    <button
+                      onClick={() =>
+                        setStatus.mutate({ conflictId: c.id, status: "DISMISSED" })
+                      }
+                      className="mono rounded border border-line px-2 py-0.5 text-[9px] text-muted-2 transition-colors hover:text-chalk"
+                    >
+                      DISMISS
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded border border-line">
+        <div className="mono border-b border-line bg-graphite/60 px-5 py-3 text-[10px] tracking-[0.24em] text-muted-2">
+          DOCUMENTS · {docs.data?.length ?? 0}
+        </div>
+        <table className="w-full">
+          <tbody>
+            {docs.data?.map((d) => (
+              <tr key={d.id} className="border-b border-line/60 last:border-0">
+                <td className="px-5 py-3">
+                  <span className="mono text-[13px] font-semibold text-chalk">
+                    {d.code}
+                  </span>
+                </td>
+                <td className="py-3 text-[13px] text-muted">{d.title}</td>
+                <td className="py-3">
+                  <span
+                    className="mono text-[9px] tracking-[0.14em]"
+                    style={{ color: discColor[d.discipline] ?? "var(--muted)" }}
+                  >
+                    {d.discipline}
+                  </span>
+                </td>
+                <td className="mono py-3 text-[10px] text-blueprint">
+                  Rev {d.revision}
+                </td>
+                <td className="mono py-3 pr-5 text-right text-[10px] text-muted-2">
+                  {d._count.refsOut}→ · {d._count.refsIn}← · {d._count.chunks}▦
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
