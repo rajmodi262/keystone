@@ -46,16 +46,50 @@ export async function answerQuestion(
   const [qvec] = await embed([question]);
   const lit = toVectorLiteral(qvec);
 
-  // Semantic retrieval over pgvector (cosine distance <=>).
-  const rows = await db.$queryRaw<RetrievedRow[]>`
-    SELECT c.id, c.content, c."documentId", d.code, d.title, d.revision,
-           d.discipline::text AS discipline,
-           1 - (c.embedding <=> ${lit}::vector) AS score
-    FROM "DocumentChunk" c
-    JOIN "Document" d ON d.id = c."documentId"
-    WHERE d."projectId" = ${projectId} AND c.embedding IS NOT NULL
-    ORDER BY c.embedding <=> ${lit}::vector
-    LIMIT 6`;
+  // Hybrid retrieval: vector similarity (pgvector) + lexical relevance (Postgres
+  // full-text), fused with Reciprocal Rank Fusion. The lexical signal catches
+  // exact terms/codes the embedding may miss, and vice-versa.
+  const [vec, lex] = await Promise.all([
+    db.$queryRaw<RetrievedRow[]>`
+      SELECT c.id, c.content, c."documentId", d.code, d.title, d.revision,
+             d.discipline::text AS discipline,
+             1 - (c.embedding <=> ${lit}::vector) AS score
+      FROM "DocumentChunk" c
+      JOIN "Document" d ON d.id = c."documentId"
+      WHERE d."projectId" = ${projectId} AND c.embedding IS NOT NULL
+      ORDER BY c.embedding <=> ${lit}::vector
+      LIMIT 10`,
+    db.$queryRaw<RetrievedRow[]>`
+      SELECT c.id, c.content, c."documentId", d.code, d.title, d.revision,
+             d.discipline::text AS discipline,
+             ts_rank(to_tsvector('english', c.content), plainto_tsquery('english', ${question})) AS score
+      FROM "DocumentChunk" c
+      JOIN "Document" d ON d.id = c."documentId"
+      WHERE d."projectId" = ${projectId}
+        AND to_tsvector('english', c.content) @@ plainto_tsquery('english', ${question})
+      ORDER BY score DESC
+      LIMIT 10`,
+  ]);
+
+  const K = 60; // RRF dampening constant
+  const fused = new Map<
+    string,
+    { row: RetrievedRow; vscore: number; rrf: number }
+  >();
+  const add = (list: RetrievedRow[], isVector: boolean) =>
+    list.forEach((r, i) => {
+      const e = fused.get(r.id) ?? { row: r, vscore: 0, rrf: 0 };
+      if (isVector) e.vscore = Number(r.score);
+      e.rrf += 1 / (K + i + 1);
+      fused.set(r.id, e);
+    });
+  add(vec, true);
+  add(lex, false);
+
+  const rows: RetrievedRow[] = Array.from(fused.values())
+    .sort((a, b) => b.rrf - a.rrf)
+    .slice(0, 6)
+    .map((e) => ({ ...e.row, score: e.vscore || Number(e.row.score) }));
 
   const citations: Citation[] = rows.map((r) => ({
     documentId: r.documentId,
