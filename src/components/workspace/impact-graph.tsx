@@ -22,12 +22,14 @@ export function ImpactGraph({
   conflictDocIds,
   focusId,
   focusNonce,
+  onOpenDocument,
 }: {
   nodes: Node[];
   edges: Edge[];
   conflictDocIds: Set<string>;
   focusId?: string | null;
   focusNonce?: number;
+  onOpenDocument?: (id: string) => void;
 }) {
   // Layered DAG layout via dagre — referenced docs rank left, referrers right,
   // so the graph reads "specs -> drawings -> RFIs" and scales past a handful of nodes.
@@ -229,6 +231,7 @@ export function ImpactGraph({
               key={n.id}
               transform={`translate(${p.x - 56},${p.y - 26})`}
               onClick={() => setSelected(n.id)}
+              onDoubleClick={() => onOpenDocument?.(n.id)}
               style={{ cursor: "pointer" }}
             >
               <rect
@@ -281,7 +284,7 @@ export function ImpactGraph({
             ? `EPICENTRE · ${nodeById.get(selected)?.code ?? ""} REVISED`
             : "SELECT A DOCUMENT"}
         </span>
-        <span>CLICK ANY NODE TO TRACE ITS BLAST RADIUS</span>
+        <span>CLICK: BLAST RADIUS · DOUBLE-CLICK: OPEN DOCUMENT</span>
       </div>
     </div>
   );

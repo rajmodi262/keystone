@@ -7,6 +7,7 @@ import { AskPanel } from "./ask-panel";
 import { UploadPanel } from "./upload-panel";
 import { ReviseEditor } from "./revise-editor";
 import { ConflictCard } from "./conflict-card";
+import { DocumentDrawer } from "./document-drawer";
 
 const discColor: Record<string, string> = {
   SPEC: "var(--blueprint)",
@@ -40,6 +41,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     conflicts: number;
   } | null>(null);
   const nonceRef = useRef(0);
+  const [openDocId, setOpenDocId] = useState<string | null>(null);
 
   const refreshAll = () => {
     utils.documents.graph.invalidate({ projectId });
@@ -84,6 +86,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           conflictDocIds={conflictDocIds}
           focusId={focus?.id}
           focusNonce={focus?.nonce}
+          onOpenDocument={setOpenDocId}
         />
       ) : (
         <div className="relative flex h-[380px] flex-col items-center justify-center overflow-hidden rounded border border-dashed border-line bg-graphite/40 text-center">
@@ -170,9 +173,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
             {docs.data?.map((d) => (
               <tr key={d.id} className="border-b border-line/60 last:border-0">
                 <td className="px-5 py-3">
-                  <span className="mono text-[13px] font-semibold text-chalk">
+                  <button
+                    onClick={() => setOpenDocId(d.id)}
+                    className="mono text-[13px] font-semibold text-chalk transition-colors hover:text-blueprint"
+                  >
                     {d.code}
-                  </span>
+                  </button>
                 </td>
                 <td className="py-3 text-[13px] text-muted">{d.title}</td>
                 <td className="py-3">
@@ -202,6 +208,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           </tbody>
         </table>
       </div>
+
+      {openDocId && (
+        <DocumentDrawer
+          documentId={openDocId}
+          onClose={() => setOpenDocId(null)}
+        />
+      )}
     </div>
   );
 }
