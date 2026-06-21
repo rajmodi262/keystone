@@ -4,6 +4,7 @@ import { authOptions } from "@/server/auth";
 import { db } from "@/lib/db";
 import { SignOutButton } from "./sign-out-button";
 import { OrgActions } from "./org-actions";
+import { MembersPanel } from "./members-panel";
 
 const roleColor: Record<string, string> = {
   OWNER: "var(--blueprint)",
@@ -129,6 +130,12 @@ export default async function AppHome() {
               <OrgActions
                 orgId={m.org.id}
                 hasProjects={m.org.projects.length > 0}
+              />
+
+              <MembersPanel
+                orgId={m.org.id}
+                isOwner={m.role === "OWNER"}
+                currentUserId={session.user.id}
               />
             </div>
           ))}

@@ -20,7 +20,13 @@ const discColor: Record<string, string> = {
   OTHER: "var(--muted-2)",
 };
 
-export function ProjectWorkspace({ projectId }: { projectId: string }) {
+export function ProjectWorkspace({
+  projectId,
+  canEdit,
+}: {
+  projectId: string;
+  canEdit: boolean;
+}) {
   const graph = api.documents.graph.useQuery({ projectId });
   const conflicts = api.conflicts.list.useQuery({ projectId });
   const docs = api.documents.list.useQuery({ projectId });
@@ -57,6 +63,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
+      {!canEdit && (
+        <div className="mono rounded border border-line bg-graphite/40 px-4 py-2 text-[10px] tracking-[0.18em] text-muted-2">
+          READ-ONLY ACCESS (CLIENT ROLE) — you can view and ask, but not edit.
+        </div>
+      )}
+
       {banner && (
         <div className="flex items-center justify-between rounded border border-hazard/40 bg-hazard/5 px-4 py-3">
           <span className="mono text-[11px] text-hazard">
@@ -125,7 +137,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         />
       )}
 
-      <UploadPanel projectId={projectId} onUploaded={refreshAll} />
+      {canEdit && <UploadPanel projectId={projectId} onUploaded={refreshAll} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <AskPanel projectId={projectId} />
@@ -135,13 +147,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
             <span className="mono text-[10px] tracking-[0.24em] text-muted-2">
               DETECTED CONFLICTS
             </span>
-            <button
-              onClick={() => detect.mutate({ projectId })}
-              disabled={detect.isPending}
-              className="mono rounded border border-line px-2.5 py-1 text-[9px] tracking-[0.14em] text-muted transition-colors hover:border-blueprint hover:text-blueprint disabled:opacity-50"
-            >
-              {detect.isPending ? "SCANNING…" : "RE-SCAN"}
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => detect.mutate({ projectId })}
+                disabled={detect.isPending}
+                className="mono rounded border border-line px-2.5 py-1 text-[9px] tracking-[0.14em] text-muted transition-colors hover:border-blueprint hover:text-blueprint disabled:opacity-50"
+              >
+                {detect.isPending ? "SCANNING…" : "RE-SCAN"}
+              </button>
+            )}
           </div>
 
           {conflicts.data?.length === 0 && (
@@ -155,6 +169,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               <ConflictCard
                 key={c.id}
                 conflict={c}
+                canEdit={canEdit}
                 onSetStatus={(status) =>
                   setStatus.mutate({ conflictId: c.id, status })
                 }
@@ -196,12 +211,14 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   {d._count.refsOut}→ · {d._count.refsIn}← · {d._count.chunks}▦
                 </td>
                 <td className="py-3 pl-4 pr-5 text-right">
-                  <button
-                    onClick={() => setRevisingId(d.id)}
-                    className="mono rounded border border-line px-2.5 py-1 text-[9px] tracking-[0.14em] text-muted transition-colors hover:border-blueprint hover:text-blueprint"
-                  >
-                    REVISE
-                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => setRevisingId(d.id)}
+                      className="mono rounded border border-line px-2.5 py-1 text-[9px] tracking-[0.14em] text-muted transition-colors hover:border-blueprint hover:text-blueprint"
+                    >
+                      REVISE
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

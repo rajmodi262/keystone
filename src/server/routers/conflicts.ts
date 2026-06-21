@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { assertProjectAccess } from "../lib/access";
+import { assertProjectAccess, assertCanEditProject } from "../lib/access";
 import { detectConflicts } from "../services/conflicts";
 import {
   classifySeverity,
@@ -59,7 +59,7 @@ export const conflictsRouter = createTRPCRouter({
   detect: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await assertProjectAccess(ctx.db, ctx.user.id, input.projectId);
+      await assertCanEditProject(ctx.db, ctx.user.id, input.projectId);
       const created = await detectConflicts(input.projectId);
       return { count: created.length };
     }),
@@ -120,7 +120,7 @@ Standard precedence suggests: ${rec.rationale}`,
         select: { projectId: true },
       });
       if (!conflict) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertProjectAccess(ctx.db, ctx.user.id, conflict.projectId);
+      await assertCanEditProject(ctx.db, ctx.user.id, conflict.projectId);
       return ctx.db.conflict.update({
         where: { id: input.conflictId },
         data: { status: input.status },

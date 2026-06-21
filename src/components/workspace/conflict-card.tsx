@@ -27,9 +27,11 @@ export interface ConflictView {
 
 export function ConflictCard({
   conflict: c,
+  canEdit = true,
   onSetStatus,
 }: {
   conflict: ConflictView;
+  canEdit?: boolean;
   onSetStatus: (status: "RESOLVED" | "DISMISSED") => void;
 }) {
   const [explanation, setExplanation] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function ConflictCard({
         >
           {explain.isPending ? "THINKING…" : "EXPLAIN"}
         </button>
-        {c.status === "OPEN" ? (
+        {c.status === "OPEN" && canEdit ? (
           <>
             <button
               onClick={() => onSetStatus("RESOLVED")}

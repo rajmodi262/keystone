@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { assertProjectAccess } from "../lib/access";
+import { assertProjectAccess, assertCanEditProject } from "../lib/access";
 import { ingestDocument } from "../services/ingest";
 import { reviseDocument } from "../services/revise";
 
@@ -57,7 +57,7 @@ export const documentsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertProjectAccess(ctx.db, ctx.user.id, input.projectId);
+      await assertCanEditProject(ctx.db, ctx.user.id, input.projectId);
       return ingestDocument(input);
     }),
 
@@ -75,7 +75,7 @@ export const documentsRouter = createTRPCRouter({
         select: { projectId: true },
       });
       if (!doc) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertProjectAccess(ctx.db, ctx.user.id, doc.projectId);
+      await assertCanEditProject(ctx.db, ctx.user.id, doc.projectId);
       return reviseDocument(input.documentId, input.rawText, input.revision);
     }),
 

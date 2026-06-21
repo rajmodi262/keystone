@@ -62,7 +62,10 @@ export default async function ProjectPage({
         </p>
 
         <div className="mt-8">
-          <ProjectWorkspace projectId={project.id} />
+          <ProjectWorkspace
+            projectId={project.id}
+            canEdit={membership.role !== "CLIENT"}
+          />
         </div>
       </section>
     </main>

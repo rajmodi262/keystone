@@ -57,9 +57,14 @@ export async function POST(req: Request) {
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
   const membership = await db.membership.findUnique({
     where: { userId_orgId: { userId: session.user.id, orgId: project.orgId } },
-    select: { id: true },
+    select: { role: true },
   });
   if (!membership) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (membership.role === "CLIENT")
+    return NextResponse.json(
+      { error: "Your role is read-only (Client)." },
+      { status: 403 },
+    );
 
   // Parse the PDF to text.
   let rawText = "";
