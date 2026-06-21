@@ -11,8 +11,8 @@ Free, ~10 minutes. Neon provides Postgres **with pgvector**; Vercel hosts the Ne
    Both end with `?sslmode=require`.
 3. Apply the schema + demo data (run locally, pointed at the **direct** URL):
    ```bash
-   DATABASE_URL="<neon-direct-url>" npx prisma migrate deploy
-   DATABASE_URL="<neon-direct-url>" npm run db:seed
+   DATABASE_URL="<neon-direct-url>" DIRECT_URL="<neon-direct-url>" npx prisma migrate deploy
+   DATABASE_URL="<neon-direct-url>" DIRECT_URL="<neon-direct-url>" npm run db:seed
    ```
    The migration enables the `vector` extension automatically.
 
@@ -23,7 +23,8 @@ Free, ~10 minutes. Neon provides Postgres **with pgvector**; Vercel hosts the Ne
 3. Add **Environment Variables**:
    | Key | Value |
    |-----|-------|
-   | `DATABASE_URL` | the Neon **pooled** URL |
+   | `DATABASE_URL` | the Neon **pooled** URL (with `-pooler` in hostname) |
+   | `DIRECT_URL` | the Neon **direct** URL (without `-pooler`) |
    | `NEXTAUTH_SECRET` | `openssl rand -base64 32` (any 32+ char secret) |
    | `NEXTAUTH_URL` | `https://<your-project>.vercel.app` |
    | `OPENAI_API_KEY` | *(optional)* real embeddings + LLM conflicts |
@@ -34,3 +35,5 @@ Free, ~10 minutes. Neon provides Postgres **with pgvector**; Vercel hosts the Ne
 - Sign in to the live demo with `demo@keystone.dev` / `password123` (from the seed).
 - Prisma uses the pooled URL at runtime (serverless-safe) and the direct URL only for migrations.
 - `vector(1536)` embeddings work on Neon out of the box.
+- The `output: "standalone"` Next.js config is **only** for Docker — Vercel manages builds natively.
+
