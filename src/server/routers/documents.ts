@@ -16,12 +16,20 @@ const disciplines = [
 
 export const documentsRouter = createTRPCRouter({
   list: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        limit: z.number().int().min(1).max(200).default(100),
+        offset: z.number().int().min(0).default(0),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       await assertProjectAccess(ctx.db, ctx.user.id, input.projectId);
       return ctx.db.document.findMany({
         where: { projectId: input.projectId },
         orderBy: { code: "asc" },
+        take: input.limit,
+        skip: input.offset,
         select: {
           id: true,
           code: true,
@@ -42,8 +50,8 @@ export const documentsRouter = createTRPCRouter({
         title: z.string().min(1).max(200),
         discipline: z.enum(disciplines),
         revision: z.string().max(20).optional(),
-        rawText: z.string().min(1),
-        fileName: z.string().optional(),
+        rawText: z.string().min(1).max(200_000),
+        fileName: z.string().max(255).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

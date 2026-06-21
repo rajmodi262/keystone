@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dagre from "@dagrejs/dagre";
 
 type Node = {
   id: string;
@@ -11,20 +12,9 @@ type Node = {
 };
 type Edge = { fromDocId: string; toDocId: string | null };
 
-const COLUMN: Record<string, number> = {
-  SPEC: 0,
-  STRUCT: 1,
-  CIVIL: 1,
-  ARCH: 2,
-  MECH: 2,
-  ELEC: 2,
-  RFI: 3,
-  OTHER: 2,
-};
 const DRAWING_DISC = ["STRUCT", "ARCH", "MECH", "ELEC", "CIVIL"];
-const COLS_X = [150, 420, 690, 905];
-const W = 1000;
-const H = 560;
+const NODE_W = 112;
+const NODE_H = 52;
 
 export function ImpactGraph({
   nodes,
@@ -35,24 +25,35 @@ export function ImpactGraph({
   edges: Edge[];
   conflictDocIds: Set<string>;
 }) {
-  // deterministic layered layout: specs -> structural -> arch/mech -> rfis
-  const pos = useMemo(() => {
-    const groups: Record<number, Node[]> = {};
-    for (const n of nodes) {
-      const c = COLUMN[n.discipline] ?? 2;
-      (groups[c] = groups[c] ?? []).push(n);
-    }
+  // Layered DAG layout via dagre — referenced docs rank left, referrers right,
+  // so the graph reads "specs -> drawings -> RFIs" and scales past a handful of nodes.
+  const layout = useMemo(() => {
+    const ids = new Set(nodes.map((n) => n.id));
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({ rankdir: "LR", nodesep: 36, ranksep: 96, marginx: 24, marginy: 24 });
+    g.setDefaultEdgeLabel(() => ({}));
+    nodes.forEach((n) => g.setNode(n.id, { width: NODE_W, height: NODE_H }));
+    edges.forEach((e) => {
+      if (e.toDocId && ids.has(e.fromDocId) && ids.has(e.toDocId)) {
+        g.setEdge(e.toDocId, e.fromDocId);
+      }
+    });
+    dagre.layout(g);
     const map = new Map<string, { x: number; y: number }>();
-    for (const cStr of Object.keys(groups)) {
-      const c = Number(cStr);
-      const list = groups[c];
-      list.forEach((n, i) => {
-        const y = ((i + 1) / (list.length + 1)) * H;
-        map.set(n.id, { x: COLS_X[c] ?? 500, y });
-      });
-    }
-    return map;
-  }, [nodes]);
+    nodes.forEach((n) => {
+      const dn = g.node(n.id);
+      if (dn) map.set(n.id, { x: dn.x, y: dn.y });
+    });
+    const gg = g.graph();
+    return {
+      pos: map,
+      width: Math.max(600, gg.width ?? 1000),
+      height: Math.max(280, gg.height ?? 520),
+    };
+  }, [nodes, edges]);
+  const pos = layout.pos;
+  const W = layout.width;
+  const H = layout.height;
 
   // reverse adjacency: who references X  (blast travels X -> referrers)
   const revAdj = useMemo(() => {

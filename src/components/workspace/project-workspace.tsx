@@ -3,6 +3,7 @@
 import { api } from "@/lib/trpc/client";
 import { ImpactGraph } from "./impact-graph";
 import { AskPanel } from "./ask-panel";
+import { UploadPanel } from "./upload-panel";
 
 const discColor: Record<string, string> = {
   SPEC: "var(--blueprint)",
@@ -27,6 +28,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     onSuccess: () => utils.conflicts.list.invalidate({ projectId }),
   });
 
+  const refreshAll = () => {
+    utils.documents.graph.invalidate({ projectId });
+    utils.documents.list.invalidate({ projectId });
+    utils.conflicts.list.invalidate({ projectId });
+  };
+
   const conflictDocIds = new Set<string>();
   conflicts.data?.forEach((c) => {
     conflictDocIds.add(c.docA.id);
@@ -48,6 +55,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           </span>
         </div>
       )}
+
+      <UploadPanel projectId={projectId} onUploaded={refreshAll} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <AskPanel projectId={projectId} />

@@ -12,6 +12,18 @@ contradictions other tools hide, and maps the *blast radius* of every revision b
 
 </div>
 
+<div align="center">
+
+![Impact graph — blast radius](docs/screenshots/03-impact-graph.png)
+
+<sub>The impact graph: revise a document and the blast radius propagates outward — affected drawings and RFIs in amber, the contradiction in red.</sub>
+
+![Conflict-aware answer](docs/screenshots/04-conflict-ask.png)
+
+<sub>Ask across the project and Keystone returns the contradiction (30 MPa vs 25 MPa) with both sources — not a single confident answer.</sub>
+
+</div>
+
 ---
 
 ## The idea

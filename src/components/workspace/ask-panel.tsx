@@ -59,6 +59,12 @@ export function AskPanel({ projectId }: { projectId: string }) {
         ))}
       </div>
 
+      {ask.isError && (
+        <p className="mono mt-4 rounded border border-danger/40 bg-danger/10 px-3 py-2 text-[11px] text-danger">
+          {ask.error.message}
+        </p>
+      )}
+
       {result?.type === "conflict" && (
         <div className="mt-4 rounded border border-danger/40 bg-danger/5 p-4">
           <div className="mono mb-1 flex items-center gap-2 text-[11px] tracking-[0.18em] text-danger">

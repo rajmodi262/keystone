@@ -15,6 +15,24 @@ function text(obj: unknown) {
   };
 }
 
+// Optional access scoping: set KEYSTONE_ORG_ID to restrict this MCP server to a
+// single organization so it can't be used to read other tenants' projects.
+const SCOPE_ORG = process.env.KEYSTONE_ORG_ID?.trim() || null;
+
+async function projectInScope(projectId: string): Promise<boolean> {
+  if (!SCOPE_ORG) return true;
+  const p = await db.project.findUnique({
+    where: { id: projectId },
+    select: { orgId: true },
+  });
+  return !!p && p.orgId === SCOPE_ORG;
+}
+
+const DENIED = {
+  content: [{ type: "text" as const, text: "Access denied: project is outside this server's scope." }],
+  isError: true,
+};
+
 // Builds the Keystone MCP server: exposes the project's tools to any MCP client
 // (Claude Desktop, etc.) so an AI assistant can query the document graph directly.
 export function buildServer() {
@@ -25,6 +43,7 @@ export function buildServer() {
     { description: "List AEC projects available in Keystone." },
     async () => {
       const rows = await db.project.findMany({
+        where: SCOPE_ORG ? { orgId: SCOPE_ORG } : undefined,
         select: { id: true, name: true, code: true },
       });
       return text(rows);
@@ -38,6 +57,7 @@ export function buildServer() {
       inputSchema: { projectId: z.string() },
     },
     async ({ projectId }) => {
+      if (!(await projectInScope(projectId))) return DENIED;
       const rows = await db.document.findMany({
         where: { projectId },
         orderBy: { code: "asc" },
@@ -59,6 +79,7 @@ export function buildServer() {
       },
     },
     async ({ projectId, query, k }) => {
+      if (!(await projectInScope(projectId))) return DENIED;
       const [qv] = await embed([query]);
       const lit = toVectorLiteral(qv);
       const rows = await db.$queryRaw<
@@ -90,6 +111,7 @@ export function buildServer() {
       inputSchema: { projectId: z.string(), question: z.string() },
     },
     async ({ projectId, question }) => {
+      if (!(await projectInScope(projectId))) return DENIED;
       return text(await answerQuestion(projectId, question));
     },
   );
@@ -101,6 +123,7 @@ export function buildServer() {
       inputSchema: { projectId: z.string() },
     },
     async ({ projectId }) => {
+      if (!(await projectInScope(projectId))) return DENIED;
       const rows = await db.conflict.findMany({
         where: { projectId },
         select: {
