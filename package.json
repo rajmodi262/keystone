@@ -20,7 +20,8 @@
     "test:integration": "vitest run tests/integration",
     "test:all": "vitest run",
     "test:watch": "vitest",
-    "shots": "tsx scripts/screenshot.mts"
+    "shots": "tsx scripts/screenshot.mts",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
