@@ -46,11 +46,15 @@ export async function embed(texts: string[]): Promise<number[][]> {
 }
 
 // Returns "" when no LLM configured; callers fall back to heuristics.
-export async function chat(system: string, user: string): Promise<string> {
+export async function chat(
+  system: string,
+  user: string,
+  temperature = 0.1,
+): Promise<string> {
   if (!client) return "";
   const res = await client.chat.completions.create({
     model: process.env.LLM_MODEL || "gpt-4o-mini",
-    temperature: 0.1,
+    temperature,
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },

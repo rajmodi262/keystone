@@ -8,8 +8,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: keystone
+          POSTGRES_PASSWORD: keystone
+          POSTGRES_DB: keystone
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U keystone -d keystone"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: "postgresql://user:pass@localhost:5432/keystone?schema=public"
+      DATABASE_URL: "postgresql://keystone:keystone@localhost:5432/keystone?schema=public"
+      DIRECT_URL: "postgresql://keystone:keystone@localhost:5432/keystone?schema=public"
       NEXTAUTH_SECRET: "ci-only-secret-ci-only-secret-0123456789"
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
@@ -20,7 +35,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
+      - run: npx prisma migrate deploy
       - run: npx tsc --noEmit
       - run: npm run lint
-      - run: npm test
+      - run: npm run test:all
       - run: npm run build

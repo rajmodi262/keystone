@@ -30,14 +30,31 @@ async function llmConflicts(
   const raw = await chat(
     "You compare two construction documents and report only genuine factual contradictions (different required values, ratings, materials, or directives for the same thing). Respond with a JSON array of objects {topic, valueA, valueB}. If there are none, respond with [].",
     `Document A (${a.code}):\n${(a.rawText ?? "").slice(0, 2500)}\n\nDocument B (${b.code}):\n${(b.rawText ?? "").slice(0, 2500)}`,
+    0, // temperature 0 -> stable, repeatable detection
   );
   if (!raw) return [];
+
+  // Grounding: only keep a contradiction if BOTH cited values literally appear
+  // in the document pair. Kills hallucinated/unstable findings -> deterministic.
+  const aText = (a.rawText ?? "").toLowerCase().replace(/\s+/g, " ");
+  const bText = (b.rawText ?? "").toLowerCase().replace(/\s+/g, " ");
+  const grounded = (v: string) => {
+    const n = v.toLowerCase().replace(/\s+/g, " ").trim();
+    return n.length > 0 && (aText.includes(n) || bText.includes(n));
+  };
+
   try {
     const json = raw.replace(/```json|```/g, "").trim();
     const arr = JSON.parse(json) as Array<{ topic: string; valueA: string; valueB: string }>;
     if (!Array.isArray(arr)) return [];
     return arr
       .filter((x) => x && x.topic && x.valueA && x.valueB)
+      .filter(
+        (x) =>
+          String(x.valueA) !== String(x.valueB) &&
+          grounded(String(x.valueA)) &&
+          grounded(String(x.valueB)),
+      )
       .map((x) => ({
         topic: String(x.topic).slice(0, 120),
         docAId: a.id,
