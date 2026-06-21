@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { assertOrgAccess, assertProjectAccess } from "../lib/access";
+import { createSampleProject } from "../services/sample";
 
 export const projectsRouter = createTRPCRouter({
   list: protectedProcedure
@@ -34,6 +35,14 @@ export const projectsRouter = createTRPCRouter({
         data: { orgId: input.orgId, name: input.name, code: input.code },
         select: { id: true, name: true, code: true },
       });
+    }),
+
+  createSample: protectedProcedure
+    .input(z.object({ orgId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertOrgAccess(ctx.db, ctx.user.id, input.orgId);
+      const r = await createSampleProject(input.orgId);
+      return { id: r.project.id, conflicts: r.conflicts };
     }),
 
   get: protectedProcedure

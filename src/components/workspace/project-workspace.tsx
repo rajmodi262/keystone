@@ -42,17 +42,33 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      {graph.data ? (
+      {!graph.data ? (
+        <div className="flex h-[380px] items-center justify-center rounded border border-line bg-graphite/40">
+          <span className="mono text-[11px] tracking-[0.2em] text-muted-2">
+            LOADING GRAPH…
+          </span>
+        </div>
+      ) : graph.data.nodes.length > 0 ? (
         <ImpactGraph
           nodes={graph.data.nodes}
           edges={graph.data.edges}
           conflictDocIds={conflictDocIds}
         />
       ) : (
-        <div className="flex h-[380px] items-center justify-center rounded border border-line bg-graphite/40">
-          <span className="mono text-[11px] tracking-[0.2em] text-muted-2">
-            LOADING GRAPH…
-          </span>
+        <div className="relative flex h-[380px] flex-col items-center justify-center overflow-hidden rounded border border-dashed border-line bg-graphite/40 text-center">
+          <div className="lt-grid opacity-50" />
+          <p className="mono relative z-10 text-[11px] tracking-[0.24em] text-muted-2">
+            EMPTY PROJECT
+          </p>
+          <h3 className="relative z-10 mt-3 text-xl font-medium">
+            Upload a document to begin
+          </h3>
+          <p className="relative z-10 mt-2 max-w-md text-sm text-muted">
+            Add a spec or drawing (PDF) below. Keystone extracts its references to
+            build the dependency graph, then watches for contradictions across the
+            set.
+          </p>
+          <p className="relative z-10 mt-4 mono text-[18px] text-blueprint">↓</p>
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/server/auth";
 import { db } from "@/lib/db";
 import { SignOutButton } from "./sign-out-button";
+import { OrgActions } from "./org-actions";
 
 const roleColor: Record<string, string> = {
   OWNER: "var(--blueprint)",
@@ -78,7 +79,8 @@ export default async function AppHome() {
           Welcome back, {user?.name?.split(" ")[0] ?? "there"}.
         </h1>
         <p className="mt-2 text-sm text-muted">
-          Your organizations and roles. Projects and documents come next.
+          Your organizations and projects. Open one to monitor its documents for
+          contradictions.
         </p>
 
         <div className="mt-10 grid gap-px overflow-hidden rounded border border-line bg-line sm:grid-cols-2">
@@ -123,6 +125,11 @@ export default async function AppHome() {
                   </a>
                 ))}
               </div>
+
+              <OrgActions
+                orgId={m.org.id}
+                hasProjects={m.org.projects.length > 0}
+              />
             </div>
           ))}
         </div>
