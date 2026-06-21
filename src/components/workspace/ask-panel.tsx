@@ -67,11 +67,16 @@ export function AskPanel({ projectId }: { projectId: string }) {
 
       {result?.type === "conflict" && (
         <div className="mt-4 rounded border border-danger/40 bg-danger/5 p-4">
-          <div className="mono mb-1 flex items-center gap-2 text-[11px] tracking-[0.18em] text-danger">
-            <span className="inline-grid h-4 w-4 place-items-center rounded-full border border-danger text-[10px]">
-              !
+          <div className="mono mb-1 flex items-center justify-between text-[11px] tracking-[0.18em] text-danger">
+            <span className="flex items-center gap-2">
+              <span className="inline-grid h-4 w-4 place-items-center rounded-full border border-danger text-[10px]">
+                !
+              </span>
+              CONTRADICTION · {result.topic}
             </span>
-            CONTRADICTION · {result.topic}
+            <span className="rounded border border-danger/50 px-1.5 py-0.5 text-[8px]">
+              {result.severity}
+            </span>
           </div>
           <p className="mono mb-3 text-[11px] text-muted">
             Two governing sources disagree.
@@ -99,6 +104,16 @@ export function AskPanel({ projectId }: { projectId: string }) {
               </div>
             ))}
           </div>
+          <p className="mono mt-3 text-[10px] leading-relaxed text-muted">
+            {result.governingCode ? (
+              <>
+                ▸ <span className="text-blueprint">{result.governingCode} governs</span>{" "}
+                — {result.rationale}
+              </>
+            ) : (
+              <>▸ {result.rationale}</>
+            )}
+          </p>
         </div>
       )}
 

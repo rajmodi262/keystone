@@ -1,6 +1,11 @@
 import { db } from "@/lib/db";
 import { embed, toVectorLiteral, chat, hasLLM } from "@/lib/ai";
 import { extractClaims, inferTopic } from "@/lib/claims";
+import {
+  classifySeverity,
+  recommendGoverning,
+  type Severity,
+} from "@/lib/precedence";
 
 export interface Citation {
   documentId: string;
@@ -26,6 +31,9 @@ export type AskResult =
   | {
       type: "conflict";
       topic: string;
+      severity: Severity;
+      governingCode: string | null;
+      rationale: string;
       sources: { code: string; revision: string; value: string; context: string }[];
       citations: Citation[];
     }
@@ -63,6 +71,7 @@ export async function answerQuestion(
   type Hit = {
     code: string;
     revision: string;
+    discipline: string;
     documentId: string;
     value: number;
     raw: string;
@@ -76,6 +85,7 @@ export async function answerQuestion(
       hits.push({
         code: r.code,
         revision: r.revision,
+        discipline: r.discipline,
         documentId: r.documentId,
         value: cl.value,
         raw: cl.raw,
@@ -109,9 +119,17 @@ export async function answerQuestion(
         if (a) break;
       }
       if (a && b) {
+        const topic = inferTopic(unit, `${a.context} ${b.context}`);
+        const rec = recommendGoverning(
+          { code: a.code, discipline: a.discipline, revision: a.revision },
+          { code: b.code, discipline: b.discipline, revision: b.revision },
+        );
         return {
           type: "conflict",
-          topic: inferTopic(unit, `${a.context} ${b.context}`),
+          topic,
+          severity: classifySeverity(topic, a.discipline, b.discipline),
+          governingCode: rec.governingCode,
+          rationale: rec.rationale,
           sources: [
             { code: a.code, revision: a.revision, value: a.raw, context: a.context },
             { code: b.code, revision: b.revision, value: b.raw, context: b.context },

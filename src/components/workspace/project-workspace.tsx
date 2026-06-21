@@ -6,6 +6,7 @@ import { ImpactGraph } from "./impact-graph";
 import { AskPanel } from "./ask-panel";
 import { UploadPanel } from "./upload-panel";
 import { ReviseEditor } from "./revise-editor";
+import { ConflictCard } from "./conflict-card";
 
 const discColor: Record<string, string> = {
   SPEC: "var(--blueprint)",
@@ -148,45 +149,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
           <div className="space-y-2">
             {conflicts.data?.map((c) => (
-              <div
+              <ConflictCard
                 key={c.id}
-                className="rounded border border-danger/30 bg-danger/5 p-3"
-              >
-                <div className="mono mb-2 flex items-center justify-between text-[11px] text-danger">
-                  <span>⚠ {c.topic}</span>
-                  <span className="text-[9px] text-muted-2">{c.status}</span>
-                </div>
-                <div className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="mono text-muted">
-                    <b className="text-chalk">{c.docA.code}</b> · {c.valueA}
-                  </span>
-                  <span className="mono text-muted-2">vs</span>
-                  <span className="mono text-muted">
-                    <b className="text-chalk">{c.docB.code}</b> ·{" "}
-                    <span className="text-danger">{c.valueB}</span>
-                  </span>
-                </div>
-                {c.status === "OPEN" && (
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() =>
-                        setStatus.mutate({ conflictId: c.id, status: "RESOLVED" })
-                      }
-                      className="mono rounded border border-line px-2 py-0.5 text-[9px] text-muted transition-colors hover:border-blueprint hover:text-blueprint"
-                    >
-                      RESOLVE
-                    </button>
-                    <button
-                      onClick={() =>
-                        setStatus.mutate({ conflictId: c.id, status: "DISMISSED" })
-                      }
-                      className="mono rounded border border-line px-2 py-0.5 text-[9px] text-muted-2 transition-colors hover:text-chalk"
-                    >
-                      DISMISS
-                    </button>
-                  </div>
-                )}
-              </div>
+                conflict={c}
+                onSetStatus={(status) =>
+                  setStatus.mutate({ conflictId: c.id, status })
+                }
+              />
             ))}
           </div>
         </div>
