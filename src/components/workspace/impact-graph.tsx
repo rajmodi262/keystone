@@ -20,10 +20,14 @@ export function ImpactGraph({
   nodes,
   edges,
   conflictDocIds,
+  focusId,
+  focusNonce,
 }: {
   nodes: Node[];
   edges: Edge[];
   conflictDocIds: Set<string>;
+  focusId?: string | null;
+  focusNonce?: number;
 }) {
   // Layered DAG layout via dagre — referenced docs rank left, referrers right,
   // so the graph reads "specs -> drawings -> RFIs" and scales past a handful of nodes.
@@ -119,6 +123,13 @@ export function ImpactGraph({
   useEffect(() => {
     if (epicentre) setSelected(epicentre);
   }, [epicentre]);
+
+  // Externally driven focus (e.g. after a revision) — re-run the blast radius
+  // from the given node. focusNonce lets the parent re-trigger the same node.
+  useEffect(() => {
+    if (focusId) setSelected(focusId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, focusNonce]);
 
   const nodeById = useMemo(
     () => new Map(nodes.map((n) => [n.id, n])),

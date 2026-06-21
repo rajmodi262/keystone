@@ -1,9 +1,11 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { api } from "@/lib/trpc/client";
 import { ImpactGraph } from "./impact-graph";
 import { AskPanel } from "./ask-panel";
 import { UploadPanel } from "./upload-panel";
+import { ReviseEditor } from "./revise-editor";
 
 const discColor: Record<string, string> = {
   SPEC: "var(--blueprint)",
@@ -28,6 +30,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     onSuccess: () => utils.conflicts.list.invalidate({ projectId }),
   });
 
+  const [revisingId, setRevisingId] = useState<string | null>(null);
+  const [focus, setFocus] = useState<{ id: string; nonce: number } | null>(null);
+  const [banner, setBanner] = useState<{
+    code: string;
+    revision: string;
+    affected: number;
+    conflicts: number;
+  } | null>(null);
+  const nonceRef = useRef(0);
+
   const refreshAll = () => {
     utils.documents.graph.invalidate({ projectId });
     utils.documents.list.invalidate({ projectId });
@@ -42,6 +54,22 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
+      {banner && (
+        <div className="flex items-center justify-between rounded border border-hazard/40 bg-hazard/5 px-4 py-3">
+          <span className="mono text-[11px] text-hazard">
+            ⚡ {banner.code} → Rev {banner.revision} committed — {banner.affected}{" "}
+            document{banner.affected === 1 ? "" : "s"} in the blast radius ·{" "}
+            {banner.conflicts} open conflict{banner.conflicts === 1 ? "" : "s"}
+          </span>
+          <button
+            onClick={() => setBanner(null)}
+            className="mono text-[10px] tracking-[0.14em] text-muted-2 transition-colors hover:text-chalk"
+          >
+            DISMISS
+          </button>
+        </div>
+      )}
+
       {!graph.data ? (
         <div className="flex h-[380px] items-center justify-center rounded border border-line bg-graphite/40">
           <span className="mono text-[11px] tracking-[0.2em] text-muted-2">
@@ -53,6 +81,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           nodes={graph.data.nodes}
           edges={graph.data.edges}
           conflictDocIds={conflictDocIds}
+          focusId={focus?.id}
+          focusNonce={focus?.nonce}
         />
       ) : (
         <div className="relative flex h-[380px] flex-col items-center justify-center overflow-hidden rounded border border-dashed border-line bg-graphite/40 text-center">
@@ -70,6 +100,25 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           </p>
           <p className="relative z-10 mt-4 mono text-[18px] text-blueprint">↓</p>
         </div>
+      )}
+
+      {revisingId && (
+        <ReviseEditor
+          documentId={revisingId}
+          onCancel={() => setRevisingId(null)}
+          onCommitted={(r) => {
+            setRevisingId(null);
+            refreshAll();
+            nonceRef.current += 1;
+            setFocus({ id: r.documentId, nonce: nonceRef.current });
+            setBanner({
+              code: r.code,
+              revision: r.revision,
+              affected: r.affectedCount,
+              conflicts: r.conflicts,
+            });
+          }}
+        />
       )}
 
       <UploadPanel projectId={projectId} onUploaded={refreshAll} />
@@ -168,8 +217,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                 <td className="mono py-3 text-[10px] text-blueprint">
                   Rev {d.revision}
                 </td>
-                <td className="mono py-3 pr-5 text-right text-[10px] text-muted-2">
+                <td className="mono py-3 text-right text-[10px] text-muted-2">
                   {d._count.refsOut}→ · {d._count.refsIn}← · {d._count.chunks}▦
+                </td>
+                <td className="py-3 pl-4 pr-5 text-right">
+                  <button
+                    onClick={() => setRevisingId(d.id)}
+                    className="mono rounded border border-line px-2.5 py-1 text-[9px] tracking-[0.14em] text-muted transition-colors hover:border-blueprint hover:text-blueprint"
+                  >
+                    REVISE
+                  </button>
                 </td>
               </tr>
             ))}

@@ -1,7 +1,9 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { assertProjectAccess } from "../lib/access";
 import { ingestDocument } from "../services/ingest";
+import { reviseDocument } from "../services/revise";
 
 const disciplines = [
   "ARCH",
@@ -57,6 +59,24 @@ export const documentsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertProjectAccess(ctx.db, ctx.user.id, input.projectId);
       return ingestDocument(input);
+    }),
+
+  revise: protectedProcedure
+    .input(
+      z.object({
+        documentId: z.string(),
+        rawText: z.string().min(1).max(200_000),
+        revision: z.string().max(20).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const doc = await ctx.db.document.findUnique({
+        where: { id: input.documentId },
+        select: { projectId: true },
+      });
+      if (!doc) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertProjectAccess(ctx.db, ctx.user.id, doc.projectId);
+      return reviseDocument(input.documentId, input.rawText, input.revision);
     }),
 
   get: protectedProcedure
